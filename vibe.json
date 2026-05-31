@@ -1,0 +1,57 @@
+{
+  "schema": "vibe-hackathon-submission-v1",
+  "team": {
+    "name": "Dose Defenders",
+    "contact_email": "contact@dosedefenders.io",
+    "members": [
+      {
+        "name": "Jamie Wilson",
+        "role": "Solo Developer"
+      }
+    ],
+    "github_org": "georgezero"
+  },
+  "project": {
+    "name": "Dose Defenders \u2014 Dose Defender",
+    "summary": "Tower defense where radiation particles advance on a patient. Place shielding towers to deflect dose. Each wave represents a treatment fraction \u2014 balance protection with therapeutic delivery.",
+    "demo_url": "https://georgezero.github.io/vibe-hackathon-alpha-team-05-dose-defender",
+    "github_url": "https://github.com/georgezero/vibe-hackathon-alpha-team-05-dose-defender",
+    "screenshot_url": "https://picsum.photos/seed/dose-defender/800/500",
+    "target_users": [
+      "radiation oncology residents",
+      "medical physics students",
+      "tower defense fans"
+    ],
+    "tags": [
+      "game",
+      "radiation",
+      "tower defense",
+      "oncology"
+    ]
+  },
+  "repo": {
+    "license": "MIT",
+    "agents_md_url": "https://github.com/georgezero/vibe-hackathon-alpha-team-05-dose-defender/blob/main/AGENTS.md",
+    "readme_url": "https://github.com/georgezero/vibe-hackathon-alpha-team-05-dose-defender/blob/main/README.md",
+    "env_example": "https://github.com/georgezero/vibe-hackathon-alpha-team-05-dose-defender/blob/main/.env.example",
+    "install": "npm install",
+    "run": "npm run dev",
+    "test": "open index.html in browser and play through one game cycle",
+    "sample_data": "See sample-data/game-states.json for example state snapshots. No real patient data."
+  },
+  "agentic_dev": {
+    "harnesses": [
+      "Claude Code",
+      "Codex CLI"
+    ],
+    "models": [
+      "claude-opus-4-5",
+      "claude-sonnet-4-5"
+    ],
+    "budget_tier": "api_50_to_200",
+    "estimated_human_hours": 10,
+    "estimated_agent_hours": 60,
+    "prompt_notes_url": "https://github.com/georgezero/vibe-hackathon-alpha-team-05-dose-defender/blob/main/docs/prompts.md",
+    "known_limitations": "Only 5 wave types implemented. Pathfinding is fixed-route, not dynamic."
+  }
+}

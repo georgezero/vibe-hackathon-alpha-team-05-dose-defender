@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dose Defenders — Dose Defender</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #1a0a0a; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; font-family: monospace; }
+    canvas { border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 0 40px rgba(0,0,0,0.5); }
+    .info { color: rgba(255,255,255,0.3); font-size: 11px; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <canvas id="c" width="800" height="500"></canvas>
+  <div class="info">Vibe Hackathon 2025 · Team 05 · Dose Defenders</div>
+  <script type="module" src="./src/main.js"></script>
+  <script>
+
+// Dose Defender — click to destroy radiation particles before they reach patient
+const C={W:800,H:500,PATIENT_Y:460};
+let state={phase:'start',score:0,hi:+(localStorage.getItem('dod-hi')||0),lives:3,particles:[],shields:[],frame:0,wave:1,spawnTimer:0};
+function reset(){state={...state,phase:'playing',score:0,lives:3,particles:[],shields:[],frame:0,wave:1,spawnTimer:0};}
+const canvas=document.getElementById('c');
+canvas.addEventListener('click',e=>{
+  if(state.phase==='start'){reset();return;}
+  if(state.phase==='gameover'){reset();return;}
+  const r=canvas.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
+  // Destroy particle
+  let hit=false;
+  state.particles=state.particles.filter(p=>{if(!hit&&Math.hypot(mx-p.x,my-p.y)<p.r+12){hit=true;state.score+=10;for(let i=0;i<5;i++)state.particles.push({x:p.x,y:p.y,vx:(Math.random()-0.5)*5,vy:(Math.random()-2)*3,r:3,speed:0,hit:true,life:20,alpha:1});return false;}return true;});
+  // Place shield if clicking empty area
+  if(!hit&&my<C.PATIENT_Y-30&&state.shields.length<6)state.shields.push({x:mx,y:my,hp:3});
+});
+function update(){
+  if(state.phase!=='playing')return;
+  state.frame++;
+  state.spawnTimer++;
+  const rate=Math.max(15,50-state.wave*3);
+  if(state.spawnTimer>=rate){state.spawnTimer=0;const spd=1.2+state.wave*0.3;state.particles.push({x:Math.random()*C.W,y:-15,vx:(Math.random()-0.5)*1.5,vy:spd,r:8,speed:spd,hit:false,life:1,alpha:1});}
+  if(state.frame%300===0)state.wave++;
+  // Update particles
+  const toRemove=[];
+  state.particles.forEach((p,i)=>{
+    if(p.hit){p.x+=p.vx;p.y+=p.vy;p.life--;p.alpha=p.life/20;if(p.life<=0)toRemove.push(i);return;}
+    p.x+=p.vx;p.y+=p.vy;
+    // Shield collision
+    let blocked=false;
+    state.shields.forEach(s=>{if(Math.hypot(p.x-s.x,p.y-s.y)<35){blocked=true;s.hp--;p.vy*=-0.5;p.vx+=(Math.random()-0.5)*2;}});
+    state.shields=state.shields.filter(s=>s.hp>0);
+    if(!blocked&&p.y>C.PATIENT_Y){state.lives--;toRemove.push(i);if(state.lives<=0){state.hi=Math.max(state.hi,state.score);localStorage.setItem('dod-hi',state.hi);state.phase='gameover';}}
+  });
+  state.particles=state.particles.filter((_,i)=>!toRemove.includes(i));
+}
+function draw(ctx){
+  ctx.fillStyle='#1a0a0a';ctx.fillRect(0,0,C.W,C.H);
+  if(state.phase==='start'){
+    ctx.fillStyle='#ff6b6b';ctx.font='bold 44px monospace';ctx.textAlign='center';ctx.fillText('DOSE DEFENDER',C.W/2,160);
+    ctx.fillStyle='#aaa';ctx.font='18px monospace';ctx.fillText('Click particles to destroy them',C.W/2,230);ctx.fillText('Click empty space to place shields (max 6)',C.W/2,265);
+    ctx.fillStyle='#ff6b6b';ctx.font='22px monospace';ctx.fillText('▶  CLICK TO START',C.W/2,360);
+    return;
+  }
+  if(state.phase==='gameover'){
+    ctx.fillStyle='#ff6b6b';ctx.font='bold 38px monospace';ctx.textAlign='center';ctx.fillText('PATIENT IRRADIATED',C.W/2,180);
+    ctx.fillStyle='#aaa';ctx.font='22px monospace';ctx.fillText(`Score: ${state.score}  Wave: ${state.wave}`,C.W/2,250);
+    ctx.fillStyle='#ff6b6b';ctx.font='20px monospace';ctx.fillText('Click to restart',C.W/2,360);
+    return;
+  }
+  // Patient bed
+  ctx.fillStyle='rgba(255,255,255,0.08)';ctx.fillRect(0,C.PATIENT_Y,C.W,40);
+  ctx.fillStyle='#aaa';ctx.font='14px monospace';ctx.textAlign='center';ctx.fillText('PATIENT',C.W/2,C.PATIENT_Y+26);
+  // Shields
+  state.shields.forEach(s=>{ctx.globalAlpha=0.3+s.hp*0.2;ctx.fillStyle='#06b6d4';ctx.beginPath();ctx.arc(s.x,s.y,30,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;ctx.strokeStyle='#06b6d4';ctx.lineWidth=2;ctx.stroke();ctx.fillStyle='white';ctx.font='10px monospace';ctx.textAlign='center';ctx.fillText(s.hp,s.x,s.y+4);});
+  // Particles
+  state.particles.forEach(p=>{
+    ctx.globalAlpha=p.alpha??1;
+    ctx.fillStyle=p.hit?'rgba(255,200,0,0.8)':'rgba(255,80,80,0.9)';
+    ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
+    if(!p.hit){ctx.strokeStyle='rgba(255,150,150,0.5)';ctx.lineWidth=2;ctx.stroke();}
+  });
+  ctx.globalAlpha=1;
+  // HUD
+  ctx.fillStyle='white';ctx.font='bold 18px monospace';ctx.textAlign='left';ctx.fillText(`SCORE: ${state.score}`,10,28);
+  ctx.textAlign='center';ctx.fillText(`Wave ${state.wave}  Lives: ${'♥'.repeat(state.lives)}`,C.W/2,28);
+  ctx.textAlign='right';ctx.fillText(`Best: ${state.hi}`,C.W-10,28);
+}
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  function loop() {
+    if(typeof update === 'function') update();
+    if(typeof draw === 'function') draw(ctx);
+    requestAnimationFrame(loop);
+  }
+  loop();
+  </script>
+</body>
+</html>
