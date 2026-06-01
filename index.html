@@ -6,92 +6,165 @@
   <title>Dose Defenders — Dose Defender</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #1a0a0a; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; font-family: monospace; }
+    body { background: #060c18; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; font-family: monospace; }
     canvas { border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 0 40px rgba(0,0,0,0.5); }
     .info { color: rgba(255,255,255,0.3); font-size: 11px; margin-top: 8px; }
   </style>
 </head>
 <body>
   <canvas id="c" width="800" height="500"></canvas>
-  <div class="info">Vibe Hackathon 2025 · Team 05 · Dose Defenders</div>
-  <script type="module" src="./src/main.js"></script>
+  <div class="info">Vibe Hackathon 2026 · Team 05 · Dose Defenders</div>
   <script>
+// Dose Defender — Breakout: shatter radiation sources before they breach the patient zone
+const C={W:800,H:500};
+const BCOLS=12,BROWS=5,BW=50,BH=20,BPAD=4,BOX=50,BOY=55;
+const TYPES=['X-RAY','CT','PET','MRI','GAMMA','FLUORO'];
+const TCOLORS=['#ff6b6b','#ffa94d','#a9e34b','#4dabf7','#cc5de8','#20c997'];
 
-// Dose Defender — click to destroy radiation particles before they reach patient
-const C={W:800,H:500,PATIENT_Y:460};
-let state={phase:'start',score:0,hi:+(localStorage.getItem('dod-hi')||0),lives:3,particles:[],shields:[],frame:0,wave:1,spawnTimer:0};
-function reset(){state={...state,phase:'playing',score:0,lives:3,particles:[],shields:[],frame:0,wave:1,spawnTimer:0};}
-const canvas=document.getElementById('c');
-canvas.addEventListener('click',e=>{
-  if(state.phase==='start'){reset();return;}
-  if(state.phase==='gameover'){reset();return;}
-  const r=canvas.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
-  // Destroy particle
-  let hit=false;
-  state.particles=state.particles.filter(p=>{if(!hit&&Math.hypot(mx-p.x,my-p.y)<p.r+12){hit=true;state.score+=10;for(let i=0;i<5;i++)state.particles.push({x:p.x,y:p.y,vx:(Math.random()-0.5)*5,vy:(Math.random()-2)*3,r:3,speed:0,hit:true,life:20,alpha:1});return false;}return true;});
-  // Place shield if clicking empty area
-  if(!hit&&my<C.PATIENT_Y-30&&state.shields.length<6)state.shields.push({x:mx,y:my,hp:3});
+let g;
+function newGame(){
+  const bricks=[];
+  for(let r=0;r<BROWS;r++)for(let c=0;c<BCOLS;c++){
+    const ti=(r*3+c)%TYPES.length;
+    bricks.push({x:BOX+c*(BW+BPAD),y:BOY+r*(BH+BPAD),w:BW,h:BH,alive:true,
+      type:TYPES[ti],color:TCOLORS[ti],hp:r<2?1:2});
+  }
+  g={phase:'start',score:0,hi:+(localStorage.getItem('dd-hi')||0),lives:3,
+    paddle:{x:360,w:80},
+    ball:{x:400,y:400,vx:3.5,vy:-4,r:7,active:false},
+    bricks,particles:[]};
+}
+newGame();
+const keys={};
+window.addEventListener('keydown',e=>{
+  keys[e.key]=true;
+  if(e.key===' '){
+    if(g.phase==='start'){g.phase='playing';g.ball.active=true;}
+    else if(g.phase==='dead'){g.phase='playing';g.ball.active=true;}
+    else if(g.phase==='gameover'||g.phase==='win'){newGame();}
+  }
+  e.preventDefault();
 });
+window.addEventListener('keyup',e=>{keys[e.key]=false;});
+
+function addParticles(x,y,color,n){
+  for(let i=0;i<n;i++){
+    g.particles.push({x,y,vx:(Math.random()-0.5)*5,vy:-1-Math.random()*3,life:20+Math.random()*10,color});
+  }
+}
+
 function update(){
-  if(state.phase!=='playing')return;
-  state.frame++;
-  state.spawnTimer++;
-  const rate=Math.max(15,50-state.wave*3);
-  if(state.spawnTimer>=rate){state.spawnTimer=0;const spd=1.2+state.wave*0.3;state.particles.push({x:Math.random()*C.W,y:-15,vx:(Math.random()-0.5)*1.5,vy:spd,r:8,speed:spd,hit:false,life:1,alpha:1});}
-  if(state.frame%300===0)state.wave++;
-  // Update particles
-  const toRemove=[];
-  state.particles.forEach((p,i)=>{
-    if(p.hit){p.x+=p.vx;p.y+=p.vy;p.life--;p.alpha=p.life/20;if(p.life<=0)toRemove.push(i);return;}
-    p.x+=p.vx;p.y+=p.vy;
-    // Shield collision
-    let blocked=false;
-    state.shields.forEach(s=>{if(Math.hypot(p.x-s.x,p.y-s.y)<35){blocked=true;s.hp--;p.vy*=-0.5;p.vx+=(Math.random()-0.5)*2;}});
-    state.shields=state.shields.filter(s=>s.hp>0);
-    if(!blocked&&p.y>C.PATIENT_Y){state.lives--;toRemove.push(i);if(state.lives<=0){state.hi=Math.max(state.hi,state.score);localStorage.setItem('dod-hi',state.hi);state.phase='gameover';}}
+  if(g.phase!=='playing')return;
+  if(keys['ArrowLeft'])g.paddle.x=Math.max(0,g.paddle.x-7);
+  if(keys['ArrowRight'])g.paddle.x=Math.min(C.W-g.paddle.w,g.paddle.x+7);
+  g.particles.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=0.12;p.life--;});
+  g.particles=g.particles.filter(p=>p.life>0);
+  if(!g.ball.active){g.ball.x=g.paddle.x+g.paddle.w/2;return;}
+  const b=g.ball;
+  b.x+=b.vx;b.y+=b.vy;
+  if(b.x-b.r<0){b.x=b.r;b.vx=Math.abs(b.vx);}
+  if(b.x+b.r>C.W){b.x=C.W-b.r;b.vx=-Math.abs(b.vx);}
+  if(b.y-b.r<0){b.y=b.r;b.vy=Math.abs(b.vy);}
+  // Paddle
+  const py=C.H-44;
+  if(b.vy>0&&b.y+b.r>=py&&b.y-b.r<=py+14&&b.x>=g.paddle.x&&b.x<=g.paddle.x+g.paddle.w){
+    b.vy=-Math.abs(b.vy);
+    const rel=(b.x-(g.paddle.x+g.paddle.w/2))/(g.paddle.w/2);
+    b.vx=rel*5.5;
+    const spd=Math.hypot(b.vx,b.vy);
+    const cap=5.5+Math.floor(g.score/600)*0.4;
+    if(spd>cap){b.vx=b.vx/spd*cap;b.vy=b.vy/spd*cap;}
+    b.vy=-Math.abs(b.vy);
+  }
+  // Ball lost
+  if(b.y>C.H+30){
+    g.lives--;
+    if(g.lives<=0){
+      if(g.score>g.hi){g.hi=g.score;localStorage.setItem('dd-hi',g.hi);}
+      g.phase='gameover';
+    } else {
+      g.ball={...g.ball,x:g.paddle.x+g.paddle.w/2,y:py-18,vx:3.5,vy:-4,active:false};
+      g.phase='dead';
+    }
+  }
+  // Brick collisions
+  g.bricks.forEach(br=>{
+    if(!br.alive)return;
+    const cx=Math.max(br.x,Math.min(b.x,br.x+br.w));
+    const cy=Math.max(br.y,Math.min(b.y,br.y+br.h));
+    const dx=b.x-cx,dy=b.y-cy;
+    if(dx*dx+dy*dy<b.r*b.r){
+      br.hp--;
+      if(br.hp<=0){br.alive=false;g.score+=10;addParticles(br.x+br.w/2,br.y+br.h/2,br.color,6);}
+      if(Math.abs(dx)>=Math.abs(dy))b.vx*=-1;else b.vy*=-1;
+      if(g.score>g.hi){g.hi=g.score;localStorage.setItem('dd-hi',g.hi);}
+    }
   });
-  state.particles=state.particles.filter((_,i)=>!toRemove.includes(i));
+  if(g.bricks.every(br=>!br.alive))g.phase='win';
 }
+
 function draw(ctx){
-  ctx.fillStyle='#1a0a0a';ctx.fillRect(0,0,C.W,C.H);
-  if(state.phase==='start'){
-    ctx.fillStyle='#ff6b6b';ctx.font='bold 44px monospace';ctx.textAlign='center';ctx.fillText('DOSE DEFENDER',C.W/2,160);
-    ctx.fillStyle='#aaa';ctx.font='18px monospace';ctx.fillText('Click particles to destroy them',C.W/2,230);ctx.fillText('Click empty space to place shields (max 6)',C.W/2,265);
-    ctx.fillStyle='#ff6b6b';ctx.font='22px monospace';ctx.fillText('▶  CLICK TO START',C.W/2,360);
+  ctx.fillStyle='#060c18';ctx.fillRect(0,0,C.W,C.H);
+  if(g.phase==='start'){
+    ctx.fillStyle='#ff6b6b';ctx.font='bold 46px monospace';ctx.textAlign='center';ctx.fillText('DOSE DEFENDER',C.W/2,152);
+    ctx.fillStyle='#aaa';ctx.font='15px monospace';
+    ctx.fillText('← →  Move shield',C.W/2,216);
+    ctx.fillText('Break all radiation sources · Protect the patient',C.W/2,242);
+    ctx.fillStyle='#ff6b6b';ctx.font='22px monospace';ctx.fillText('▶  SPACE TO LAUNCH',C.W/2,330);
+    ctx.fillStyle='#445';ctx.font='13px monospace';ctx.fillText('High Score: '+g.hi,C.W/2,398);
     return;
   }
-  if(state.phase==='gameover'){
-    ctx.fillStyle='#ff6b6b';ctx.font='bold 38px monospace';ctx.textAlign='center';ctx.fillText('PATIENT IRRADIATED',C.W/2,180);
-    ctx.fillStyle='#aaa';ctx.font='22px monospace';ctx.fillText(`Score: ${state.score}  Wave: ${state.wave}`,C.W/2,250);
-    ctx.fillStyle='#ff6b6b';ctx.font='20px monospace';ctx.fillText('Click to restart',C.W/2,360);
-    return;
-  }
-  // Patient bed
-  ctx.fillStyle='rgba(255,255,255,0.08)';ctx.fillRect(0,C.PATIENT_Y,C.W,40);
-  ctx.fillStyle='#aaa';ctx.font='14px monospace';ctx.textAlign='center';ctx.fillText('PATIENT',C.W/2,C.PATIENT_Y+26);
-  // Shields
-  state.shields.forEach(s=>{ctx.globalAlpha=0.3+s.hp*0.2;ctx.fillStyle='#06b6d4';ctx.beginPath();ctx.arc(s.x,s.y,30,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;ctx.strokeStyle='#06b6d4';ctx.lineWidth=2;ctx.stroke();ctx.fillStyle='white';ctx.font='10px monospace';ctx.textAlign='center';ctx.fillText(s.hp,s.x,s.y+4);});
-  // Particles
-  state.particles.forEach(p=>{
-    ctx.globalAlpha=p.alpha??1;
-    ctx.fillStyle=p.hit?'rgba(255,200,0,0.8)':'rgba(255,80,80,0.9)';
-    ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
-    if(!p.hit){ctx.strokeStyle='rgba(255,150,150,0.5)';ctx.lineWidth=2;ctx.stroke();}
+  // Bricks
+  g.bricks.forEach(br=>{
+    if(!br.alive)return;
+    ctx.fillStyle=br.color;ctx.fillRect(br.x,br.y,br.w,br.h);
+    if(br.hp>1){ctx.strokeStyle='rgba(255,255,255,0.25)';ctx.lineWidth=1.5;ctx.strokeRect(br.x+1.5,br.y+1.5,br.w-3,br.h-3);}
+    ctx.fillStyle='rgba(0,0,0,0.5)';ctx.font='7px monospace';ctx.textAlign='center';
+    ctx.fillText(br.type,br.x+br.w/2,br.y+br.h/2+2.5);
   });
-  ctx.globalAlpha=1;
+  // Particles
+  g.particles.forEach(p=>{
+    ctx.globalAlpha=Math.max(0,p.life/30);ctx.fillStyle=p.color;
+    ctx.fillRect(p.x-2.5,p.y-2.5,5,5);
+  });ctx.globalAlpha=1;
+  // Ball
+  const b=g.ball;
+  ctx.fillStyle='#ffffff';ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,0.15)';ctx.beginPath();ctx.arc(b.x,b.y,b.r+3,0,Math.PI*2);ctx.fill();
+  // Paddle
+  const py=C.H-44;
+  ctx.fillStyle='#4fc3f7';ctx.fillRect(g.paddle.x,py,g.paddle.w,12);
+  ctx.fillStyle='rgba(79,195,247,0.25)';ctx.fillRect(g.paddle.x+2,py+12,g.paddle.w-4,4);
+  // Patient zone
+  ctx.strokeStyle='rgba(0,230,120,0.12)';ctx.lineWidth=1;ctx.setLineDash([3,3]);
+  ctx.beginPath();ctx.moveTo(0,C.H-6);ctx.lineTo(C.W,C.H-6);ctx.stroke();ctx.setLineDash([]);
   // HUD
-  ctx.fillStyle='white';ctx.font='bold 18px monospace';ctx.textAlign='left';ctx.fillText(`SCORE: ${state.score}`,10,28);
-  ctx.textAlign='center';ctx.fillText(`Wave ${state.wave}  Lives: ${'♥'.repeat(state.lives)}`,C.W/2,28);
-  ctx.textAlign='right';ctx.fillText(`Best: ${state.hi}`,C.W-10,28);
-}
-  const canvas = document.getElementById('c');
-  const ctx = canvas.getContext('2d');
-  function loop() {
-    if(typeof update === 'function') update();
-    if(typeof draw === 'function') draw(ctx);
-    requestAnimationFrame(loop);
+  ctx.fillStyle='white';ctx.font='bold 14px monospace';ctx.textAlign='left';ctx.fillText('SCORE: '+g.score,8,16);
+  ctx.textAlign='right';ctx.fillText('BEST: '+g.hi,C.W-8,16);
+  ctx.fillStyle='#4fc3f7';ctx.font='10px monospace';ctx.textAlign='left';ctx.fillText('SHIELDS',8,C.H-18);
+  for(let i=0;i<3;i++){ctx.fillStyle=i<g.lives?'#4fc3f7':'#1a2535';ctx.fillRect(58+i*18,C.H-26,12,10);}
+  // Overlays
+  if(g.phase==='dead'){
+    ctx.fillStyle='rgba(0,0,0,0.45)';ctx.fillRect(0,0,C.W,C.H);
+    ctx.fillStyle='#ff9a3c';ctx.font='bold 30px monospace';ctx.textAlign='center';ctx.fillText('SHIELD BREACH',C.W/2,240);
+    ctx.fillStyle='#aaa';ctx.font='15px monospace';ctx.fillText('SPACE to continue',C.W/2,278);
   }
-  loop();
+  if(g.phase==='win'){
+    ctx.fillStyle='rgba(0,0,0,0.65)';ctx.fillRect(0,0,C.W,C.H);
+    ctx.fillStyle='#a9e34b';ctx.font='bold 40px monospace';ctx.textAlign='center';ctx.fillText('PATIENT PROTECTED',C.W/2,188);
+    ctx.fillStyle='#aaa';ctx.font='18px monospace';ctx.fillText('Score: '+g.score,C.W/2,248);
+    ctx.fillStyle='#ff6b6b';ctx.font='16px monospace';ctx.fillText('SPACE to play again',C.W/2,328);
+  }
+  if(g.phase==='gameover'){
+    ctx.fillStyle='rgba(0,0,0,0.7)';ctx.fillRect(0,0,C.W,C.H);
+    ctx.fillStyle='#ff4444';ctx.font='bold 40px monospace';ctx.textAlign='center';ctx.fillText('OVERDOSE',C.W/2,188);
+    ctx.fillStyle='#aaa';ctx.font='18px monospace';ctx.fillText('Score: '+g.score,C.W/2,248);
+    ctx.fillStyle='#ff6b6b';ctx.font='16px monospace';ctx.fillText('SPACE to restart',C.W/2,328);
+  }
+}
+
+const canvas=document.getElementById('c');const ctx=canvas.getContext('2d');
+(function loop(){update();draw(ctx);requestAnimationFrame(loop);})();
   </script>
 </body>
 </html>
